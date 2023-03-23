@@ -43,6 +43,61 @@ ASSUME NIsPosNat == N \in Nat \ {0}
  \* TODO 10 \in 1..10
  \* TODO 1 \in 1..0
 
+Node == 0 .. N - 1
+
+VARIABLE active, network
+
+TypeOK ==
+    \* shorthand to express the two stmts below
+    /\ network \in [ Node -> Nat ]
+    \* /\ \A n \in Node: network[n] > 0
+    \* /\ DOMAIN network = Node
+    /\ active \in [ Node -> BOOLEAN ]
+
+
+\* repl: [0 .. 2 -> {"a", "b"}]
+\* repl: Cardinality([ 0..2 -> {"a", "b"} ])
+
+
+
+\* Intialization 
+Init == 
+    \* /\ active = [ n \in Node |-> TRUE ]
+    /\ active \in [ Node -> BOOLEAN ]
+    /\ network = [ n \in Node |-> 0 ]
+
+\* Idles
+Terminates(n) == 
+   /\ active[n] = TRUE 
+   \* syntax sugar (shortcut for below)
+   /\ active' = [ active EXCEPT ![n] = FALSE ]
+   \* /\ active' = [ m \in Node |-> IF m = n THEN FALSE ELSE active[m] ]
+   /\ network' = network
+
+\* increment counter
+SendMsg(snd, rcv) == 
+    /\ UNCHANGED active
+    /\ active[snd] = TRUE
+    /\ network' = [ network EXCEPT ![rcv] = @ + 1 ]
+
+\* decrement counter
+RecvMsg(rcv) == 
+    /\ network[rcv] > 0
+    \* non-sugar equivalents below
+    /\ active' = [ active EXCEPT ![rcv] = TRUE ]
+    /\ network' = [ network EXCEPT ![rcv] = @ - 1 ]
+    \* /\ active' = [ m \in Node |-> IF m = rcv THEN TRUE ELSE active[m] ]
+    \* /\ network' = [ m \in Node |-> IF m = rcv THEN network[rcv] - 1 ELSE network[m] ]
+
+Next == 
+    \E n,m \in Node:
+        \/ Terminates(n)
+        \/ SendMsg(n,m)
+        \/ RecvMsg(n)
+
+Constraint ==
+    \A n \in Node: network[n] < 2
+
 =============================================================================
 \* Modification History
 \* Created Sun Jan 10 15:19:20 CET 2021 by Stephan Merz @muenchnerkindl

@@ -69,7 +69,7 @@ terminated ==
 Init == 
     \* /\ active = [ n \in Node |-> TRUE ]
     /\ active \in [ Node -> BOOLEAN ]
-    /\ network = [ n \in Node |-> 0 ]
+    /\ network = [ n \in Node |-> 0..3 ]
     /\ terminatationDetected \in {FALSE, terminated}
 
 \* Idles
@@ -81,7 +81,7 @@ Terminates(n) ==
    /\ network' = network
    /\ \* \/ terminatationDetected' = TRUE \* violation
       \* \/ terminatationDetected' = terminated'
-      \/ terminatationDetected' \in {terminatationDetected, terminated}
+      \/ terminatationDetected' \in {terminatationDetected, terminated'}
 
 \* increment counter
 SendMsg(snd, rcv) == 
@@ -111,15 +111,19 @@ Spec == Init /\ [][Next]_vars
 -----------------
 
 \* [A]_v  <=>  A \/ UNCHANGED v
+\* []<=> "always"
 NeverUndetected == 
     [][terminatationDetected => terminatationDetected']_vars
 
+\* something bad never happens
 Safe == 
     \* IF terminatationDetected THEN terminated ELSE TRUE 
+    \* without [] + () will only check initial state
     [](terminatationDetected => terminated)
 
-\* requires fairness constraint
+\* something good will eventually occur
 Live == 
+    \* requires fairness constraint
     [](terminated => <>terminatationDetected)  
 
 THEOREM Spec => Safe /\ NeverUndetected /\ Live

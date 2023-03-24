@@ -40,24 +40,20 @@ Colors ==
     {White,Black}
 
 VARIABLE 
-    active, 
-    color,
-    counter, 
-    
+    active, color, counter, \* node functions
     network,
-    
-    token \* [ q |-> 42, color |-> "white", pos |-> 0]
+    token                   \* [ q |-> 42, color |-> "white", pos |-> 0]
 vars == <<active, network, color, counter, token>>
 
 terminated ==
     \A n \in Node: active[n] = FALSE /\ network[n] = 0
 
 terminationDetected ==
-    /\ token.pos = 0
-    /\ token.color = White
-    /\ token.q = 0
-    /\ ~active[0]
-    /\ color[0] = White
+    /\ token.pos = 0             \* back at start pos
+    /\ token.color = White       \* token must be white (untainted)
+    /\ token.q + counter[0] = 0  \* counter value must be 0
+    /\ ~active[0]                \* node cannot be active
+    /\ color[0] = White          \* node[0] must be white
 
 TypeOK ==
     /\ active \in [ Node -> BOOLEAN ]
@@ -75,6 +71,7 @@ Init ==
 
 InitiateToken ==
     \* ???
+    /\ ~terminationDetected
     /\ token.pos = 0
     /\ token' = [ token EXCEPT !["q"] = 0,
                                !["pos"]= N - 1,
@@ -95,22 +92,21 @@ PassToken ==
 
 Terminates(n) ==
     \* /\ active[n] = TRUE \* ???
-    /\ active' = [active EXCEPT ![n] = FALSE]
+    /\ active' = [ active EXCEPT ![n] = FALSE ]
     /\ UNCHANGED <<network, color, counter, token>>
 
 SendMsg(snd, rcv) ==
-    /\ UNCHANGED active
     /\ active[snd] = TRUE
     /\ network' = [ network EXCEPT ![rcv] = @ + 1 ]
-    /\ counter' = [counter EXCEPT ![snd] = @ + 1]
-    /\ UNCHANGED <<color, token>>
+    /\ counter' = [ counter EXCEPT ![snd] = @ + 1 ]
+    /\ UNCHANGED <<active, color, token>>
 
 RecvMsg(rcv) ==
     /\ network[rcv] > 0
     \* /\ active[rcv] = TRUE \* ???
-    /\ active' = [active EXCEPT ![rcv] = TRUE]
+    /\ active' = [ active EXCEPT ![rcv] = TRUE ]
     /\ network' = [ network EXCEPT ![rcv] = network[rcv] - 1 ]
-    /\ counter' = [counter EXCEPT ![rcv] = @ - 1]
+    /\ counter' = [ counter EXCEPT ![rcv] = @ - 1 ]
     /\ UNCHANGED <<color, token>>
 
 Next ==
@@ -122,7 +118,7 @@ Next ==
         \/ PassToken
 
 Spec ==
-    Init /\ [] [Next]_vars /\ WF_vars(Next)
+    Init /\ [][Next]_vars /\ WF_vars(Next)
 
 ATD ==
     INSTANCE AsyncTerminationDetection
@@ -130,6 +126,18 @@ ATD ==
 ATDSpec == ATD!Spec
 
 THEOREM Spec => ATDSpec
+
+\* Add term output to error message
+Alias == 
+    [ 
+       active |-> active
+      ,color |-> color
+      ,counter |-> counter
+      ,newtork |-> network
+      ,token |-> token
+      ,term |-> terminated
+      ,td |-> terminationDetected
+    ]
 
 -------------------
 

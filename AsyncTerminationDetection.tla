@@ -1,3 +1,4 @@
+TODO: add counters, token, color
 ---------------------- MODULE AsyncTerminationDetection ---------------------
 \* * TLA+ is an expressive language and we usually define operators on-the-fly.
  \* * That said, the TLA+ reference guide "Specifying Systems" (download from:
@@ -45,7 +46,8 @@ ASSUME NIsPosNat == N \in Nat \ {0}
 
 Node == 0 .. N - 1
 
-VARIABLE active, network
+VARIABLE active, network, terminatationDetected
+vars == <<active, network, terminatationDetected>>
 
 TypeOK ==
     \* shorthand to express the two stmts below
@@ -53,18 +55,22 @@ TypeOK ==
     \* /\ \A n \in Node: network[n] > 0
     \* /\ DOMAIN network = Node
     /\ active \in [ Node -> BOOLEAN ]
+    /\ terminatationDetected \in BOOLEAN
 
 
 \* repl: [0 .. 2 -> {"a", "b"}]
 \* repl: Cardinality([ 0..2 -> {"a", "b"} ])
 
 
+terminated ==
+    \A n \in Node: active[n] = FALSE /\ network[n] = 0
 
 \* Intialization 
 Init == 
     \* /\ active = [ n \in Node |-> TRUE ]
     /\ active \in [ Node -> BOOLEAN ]
     /\ network = [ n \in Node |-> 0 ]
+    /\ terminatationDetected \in {FALSE, terminated}
 
 \* Idles
 Terminates(n) == 
@@ -73,12 +79,16 @@ Terminates(n) ==
    /\ active' = [ active EXCEPT ![n] = FALSE ]
    \* /\ active' = [ m \in Node |-> IF m = n THEN FALSE ELSE active[m] ]
    /\ network' = network
+   /\ \* \/ terminatationDetected' = TRUE \* violation
+      \* \/ terminatationDetected' = terminated'
+      \/ terminatationDetected' \in {terminatationDetected, terminated}
 
 \* increment counter
 SendMsg(snd, rcv) == 
     /\ UNCHANGED active
     /\ active[snd] = TRUE
     /\ network' = [ network EXCEPT ![rcv] = @ + 1 ]
+    /\ UNCHANGED terminatationDetected
 
 \* decrement counter
 RecvMsg(rcv) == 
@@ -88,12 +98,31 @@ RecvMsg(rcv) ==
     /\ network' = [ network EXCEPT ![rcv] = @ - 1 ]
     \* /\ active' = [ m \in Node |-> IF m = rcv THEN TRUE ELSE active[m] ]
     \* /\ network' = [ m \in Node |-> IF m = rcv THEN network[rcv] - 1 ELSE network[m] ]
+    /\ UNCHANGED terminatationDetected
 
 Next == 
     \E n,m \in Node:
         \/ Terminates(n)
         \/ SendMsg(n,m)
         \/ RecvMsg(n)
+
+Spec == Init /\ [][Next]_vars
+
+-----------------
+
+\* [A]_v  <=>  A \/ UNCHANGED v
+NeverUndetected == 
+    [][terminatationDetected => terminatationDetected']_vars
+
+Safe == 
+    \* IF terminatationDetected THEN terminated ELSE TRUE 
+    [](terminatationDetected => terminated)
+
+\* requires fairness constraint
+Live == 
+    [](terminated => <>terminatationDetected)  
+
+THEOREM Spec => Safe /\ NeverUndetected /\ Live
 
 Constraint ==
     \A n \in Node: network[n] < 2
